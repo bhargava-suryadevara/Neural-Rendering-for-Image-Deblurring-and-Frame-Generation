@@ -1,14 +1,10 @@
 ## Neural Rendering for Image Deblurring (Phase 1)
 
-This repository provides a clean baseline for **supervised image deblurring** using the **GoPro** and **RealBlur-J** datasets.
+This repository provides a clean baseline for **supervised image deblurring** using the **GoPro** dataset.
 
 ### Datasets
 
 - **GoPro**: `Data/GOPRO_Large/{train,test}/<scene>/{blur,sharp}/*.png`
-- **RealBlur-J**: `Data/RealBlur/RealBlur-J_ECC_IMCORR_centroid_itensity_ref/sceneXXX/{blur,gt}/*.png`
-  - Train/test splits defined by:
-    - `Data/RealBlur/RealBlur_J_train_list.txt`
-    - `Data/RealBlur/RealBlur_J_test_list.txt`
 
 ### Setup
 
@@ -35,24 +31,12 @@ This will:
 - Periodically save sample deblurred images under `outputs/samples/`.
 - Save model checkpoints under `outputs/checkpoints/`.
 
-### Evaluation
+### Evaluation (GoPro)
 
-**GoPro test:**
-
-```bash
-python3 evaluate.py \
-  --checkpoint "outputs/checkpoints/latest.pth" \
-  --dataset gopro \
-  --gopro-root "Data/GOPRO_Large"
-```
-
-**RealBlur-J test:**
+Evaluate on the GoPro test set:
 
 ```bash
-python3 evaluate.py \
-  --checkpoint "outputs/checkpoints/latest.pth" \
-  --dataset realblur \
-  --realblur-root "Data/RealBlur"
+python3 evaluate.py --checkpoint outputs/checkpoints/best.pth --gopro-root Data/GOPRO_Large
 ```
 
 ### Sanity check (tiny subset)
