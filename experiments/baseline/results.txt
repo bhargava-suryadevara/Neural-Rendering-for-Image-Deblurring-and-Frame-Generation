@@ -1,0 +1,12 @@
+Experiment: Baseline UNet
+Model: UNet (base_channels=32)
+Dataset: GoPro
+Epochs: 30
+Batch size: 4
+Crop size: 256
+Device: CPU
+
+Best validation checkpoint: epoch 29
+Final evaluation:
+PSNR: 25.610
+SSIM: 0.7627
