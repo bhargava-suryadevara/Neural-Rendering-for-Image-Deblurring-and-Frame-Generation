@@ -1,0 +1,2 @@
+experiment_name,model,base_channels,epochs,batch_size,crop_size,lr,psnr,ssim,notes
+baseline_unet32,UNet,32,30,4,256,1e-4,25.610,0.7627,GoPro baseline on CPU
