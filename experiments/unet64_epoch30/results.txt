@@ -1,0 +1,23 @@
+Experiment: UNet-64 (Increased Capacity)
+
+Model: UNet (base_channels=64)
+Dataset: GoPro
+
+Training:
+- Epochs: 30
+- Batch size: 4
+- Crop size: 256
+- Device: CPU
+
+Best checkpoint:
+- Epoch: 27
+
+Final Evaluation:
+- PSNR: 25.808
+- SSIM: 0.7625
+
+Notes:
+- Increased model capacity from 32 → 64 channels
+- Slight improvement in PSNR compared to baseline
+- SSIM remained nearly the same
+- Indicates diminishing returns for simple capacity scaling

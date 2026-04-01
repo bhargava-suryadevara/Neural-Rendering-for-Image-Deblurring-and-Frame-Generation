@@ -3,6 +3,7 @@ import os
 from typing import Optional
 
 import torch
+import torch.nn.functional as F
 from torch import nn
 from torch.utils.data import DataLoader, Subset
 from torchvision.utils import save_image
@@ -12,6 +13,7 @@ from src.datasets.gopro_dataset import GoProDataset
 from src.models.unet import UNet
 from src.utils.image_io import ensure_dir, save_triplet_grid
 from src.utils.metrics import batch_psnr_ssim
+from src.utils.ssim_loss import differentiable_ssim
 
 
 def parse_args() -> argparse.Namespace:
@@ -22,7 +24,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--crop-size", type=int, default=256)
     parser.add_argument("--num-workers", type=int, default=4)
-    parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
+    default_device = "cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu")
+    parser.add_argument("--device", type=str, default=default_device)
     parser.add_argument("--output-dir", type=str, default="outputs")
     parser.add_argument("--max-train-samples", type=int, default=0, help="If >0, limit number of training samples (sanity check).")
     parser.add_argument("--max-val-samples", type=int, default=0, help="If >0, limit number of val samples (sanity check).")
@@ -35,6 +38,7 @@ def build_dataloaders(
     batch_size: int,
     crop_size: int,
     num_workers: int,
+    pin_memory: bool,
     max_train_samples: int = 0,
     max_val_samples: int = 0,
 ) -> tuple[DataLoader, DataLoader]:
@@ -63,14 +67,14 @@ def build_dataloaders(
         batch_size=batch_size,
         shuffle=True,
         num_workers=num_workers,
-        pin_memory=True,
+        pin_memory=pin_memory,
     )
     val_loader = DataLoader(
         val_ds,
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
-        pin_memory=True,
+        pin_memory=pin_memory,
     )
     return train_loader, val_loader
 
@@ -117,12 +121,13 @@ def main() -> None:
         batch_size=args.batch_size,
         crop_size=args.crop_size,
         num_workers=args.num_workers,
+        pin_memory=(device.type == "cuda"),
         max_train_samples=args.max_train_samples,
         max_val_samples=args.max_val_samples,
     )
 
-    model = UNet(in_channels=3, out_channels=3, base_channels=32).to(device)
-    criterion = nn.L1Loss()
+    # Experiment 1: increased UNet capacity for comparison with baseline
+    model = UNet(in_channels=3, out_channels=3, base_channels=64).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     global_step = 0
@@ -137,7 +142,11 @@ def main() -> None:
 
             optimizer.zero_grad()
             pred = model(blur)
-            loss = criterion(pred, sharp)
+            l1_loss = F.l1_loss(pred, sharp)
+            ssim_value = differentiable_ssim(pred, sharp)
+            ssim_loss_term = 1.0 - ssim_value
+            # Experiment 3: combined L1 + SSIM loss for better structural reconstruction
+            loss = 0.8 * l1_loss + 0.2 * ssim_loss_term
             loss.backward()
             optimizer.step()
 

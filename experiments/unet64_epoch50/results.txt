@@ -1,0 +1,28 @@
+Experiment: UNet-64 (Longer Training)
+
+Model: UNet (base_channels=64)
+Dataset: GoPro
+
+Training:
+- Epochs: 50
+- Batch size: 4
+- Crop size: 256
+- Device: MPS
+
+Best checkpoint:
+- Epoch: 46
+
+Best Validation:
+- PSNR: 25.840
+- SSIM: 0.7697
+
+Final Evaluation:
+- PSNR: 25.806
+- SSIM: 0.7690
+
+Notes:
+- Same UNet-64 architecture as previous experiment
+- Trained longer than 30 epochs
+- Slight improvement in PSNR compared to 30-epoch run
+- Clearer improvement in SSIM
+- Suggests longer training helps, but gains are modest

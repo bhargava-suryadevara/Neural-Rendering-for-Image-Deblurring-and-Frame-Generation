@@ -1,0 +1,22 @@
+Experiment: UNet-64 with Combined L1 + SSIM Loss
+
+Model: UNet (base_channels=64)
+Dataset: GoPro
+
+Training:
+- Epochs: 30
+- Batch size: 4
+- Crop size: 256
+- Device: MPS
+
+Best checkpoint:
+- Epoch: 25
+
+Final Evaluation:
+- PSNR: 25.918
+- SSIM: 0.7734
+
+Notes:
+- Combined L1 + SSIM loss improved performance over pure L1
+- Strongest results among all experiments
+- Indicates structural loss is key for deblurring quality

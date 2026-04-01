@@ -19,7 +19,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=4)
     parser.add_argument("--crop-size", type=int, default=256)
     parser.add_argument("--num-workers", type=int, default=4)
-    parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
+    default_device = "cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu")
+    parser.add_argument("--device", type=str, default=default_device)
     parser.add_argument("--output-dir", type=str, default="outputs_eval")
     parser.add_argument("--max-samples", type=int, default=0, help="If >0, limit number of evaluated samples.")
     parser.add_argument("--save-samples", action="store_true", help="Save example output images.")
@@ -32,6 +33,7 @@ def build_loader(
     crop_size: int,
     num_workers: int,
     max_samples: int,
+    pin_memory: bool,
 ) -> DataLoader:
     ds = GoProDataset(
         root=gopro_root,
@@ -49,14 +51,15 @@ def build_loader(
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
-        pin_memory=True,
+        pin_memory=pin_memory,
     )
     return loader
 
 
 def load_model(checkpoint_path: str, device: torch.device) -> nn.Module:
     ckpt = torch.load(checkpoint_path, map_location=device)
-    model = UNet(in_channels=3, out_channels=3, base_channels=32).to(device)
+    # Experiment 1: increased UNet capacity for comparison with baseline
+    model = UNet(in_channels=3, out_channels=3, base_channels=64).to(device)
     state_dict = ckpt.get("model_state", ckpt)
     model.load_state_dict(state_dict)
     model.eval()
@@ -78,6 +81,7 @@ def main() -> None:
         crop_size=args.crop_size,
         num_workers=args.num_workers,
         max_samples=args.max_samples,
+        pin_memory=(device.type == "cuda"),
     )
 
     model = load_model(args.checkpoint, device)
