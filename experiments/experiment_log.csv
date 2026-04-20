@@ -3,3 +3,4 @@ baseline_unet32,UNet,32,30,4,256,1e-4,25.610,0.7627,GoPro baseline on CPU
 unet64,UNet,64,30,4,256,1e-4,25.808,0.7625,Increased capacity
 unet64_epoch50,UNet,64,50,4,256,1e-4,25.840,0.7697,Longer training on MPS
 unet64_l1_ssim_epoch30,UNet,64,30,4,256,1e-4,25.918,0.7734,L1+SSIM loss (best result)
+unet64_charb_ssim_epoch30,UNet,64,30,4,256,1e-4,25.900,0.7726,Charbonnier+SSIM loss
