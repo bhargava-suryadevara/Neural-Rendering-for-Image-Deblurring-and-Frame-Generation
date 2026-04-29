@@ -17,3 +17,14 @@ __pycache__/
 
 # Logs
 *.log
+
+# datasets
+Datasets/
+MPRNet/Deblurring/Datasets/
+
+# model checkpoints
+checkpoints/
+MPRNet/Deblurring/checkpoints/
+
+#all results from test.py
+MPRNet/Deblurring/results/
