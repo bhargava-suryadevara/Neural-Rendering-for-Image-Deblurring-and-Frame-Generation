@@ -12,8 +12,8 @@ from tqdm import tqdm
 
 from src.datasets.gopro_dataset import GoProDataset
 from src.models.unet import UNet
-from src.utils.image_io import ensure_dir, save_triplet_grid
-from src.utils.metrics import batch_psnr_ssim
+from src.utils.image_io import ensure_dir, save_labeled_triplet_grid
+from src.utils.metrics import batch_psnr_ssim, fast_batch_psnr_ssim, per_image_psnr_ssim
 from src.utils.ssim_loss import differentiable_ssim
 
 
@@ -113,6 +113,8 @@ def save_fixed_val_panel(
     device: torch.device,
     out_path: str,
     indices: list[int],
+    epoch: int = 0,
+    loss_type: str = "l1_ssim",
 ) -> None:
     model.eval()
     picked = [i for i in indices if 0 <= i < len(val_ds)]
@@ -128,7 +130,20 @@ def save_fixed_val_panel(
         blur = torch.stack(blur_list, dim=0).to(device)
         sharp = torch.stack(sharp_list, dim=0).to(device)
         pred = model(blur)
-    save_triplet_grid(blur, sharp, pred, out_path, n_display=len(picked))
+
+    # Compute per-image PSNR and SSIM for the panel labels
+    # Uses scikit-image only for this small fixed set (not the whole val loader)
+    psnr_vals, ssim_vals = per_image_psnr_ssim(pred, sharp)
+
+    loss_name = "L1+SSIM" if loss_type == "l1_ssim" else "Charb+SSIM"
+    model_label = f"UNet ({loss_name}) — Epoch {epoch}"
+    save_labeled_triplet_grid(
+        blur, sharp, pred, out_path,
+        n_display=len(picked),
+        model_label=model_label,
+        psnr_vals=psnr_vals,
+        ssim_vals=ssim_vals,
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -141,8 +156,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--num-workers", type=int, default=4)
     default_device = "cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu")
     parser.add_argument("--device", type=str, default=default_device)
-    parser.add_argument("--output-dir", type=str, default=os.path.join("experiments", "unet64_charb_ssim_epoch30"))
-    parser.add_argument("--loss", type=str, default="charb_ssim", choices=["l1_ssim", "charb_ssim"])
+    parser.add_argument("--output-dir", type=str, default=os.path.join("experiments", "unet64_l1_ssim_epoch30"))
+    parser.add_argument("--loss", type=str, default="l1_ssim", choices=["l1_ssim", "charb_ssim"])
     parser.add_argument("--max-train-samples", type=int, default=0, help="If >0, limit number of training samples (sanity check).")
     parser.add_argument("--max-val-samples", type=int, default=0, help="If >0, limit number of val samples (sanity check).")
     parser.add_argument("--val-interval", type=int, default=1, help="Validate every N epochs.")
@@ -184,6 +199,9 @@ def build_dataloaders(
         shuffle=True,
         num_workers=num_workers,
         pin_memory=pin_memory,
+        # Keep workers alive across epochs — major speedup on macOS
+        persistent_workers=(num_workers > 0),
+        prefetch_factor=2 if num_workers > 0 else None,
     )
     val_loader = DataLoader(
         val_ds,
@@ -191,6 +209,8 @@ def build_dataloaders(
         shuffle=False,
         num_workers=num_workers,
         pin_memory=pin_memory,
+        persistent_workers=(num_workers > 0),
+        prefetch_factor=2 if num_workers > 0 else None,
     )
     return train_loader, val_loader, train_ds, val_ds
 
@@ -221,7 +241,8 @@ def validate(
             else:
                 charb_loss = float(charbonnier_loss(pred, sharp).item())
             loss = 0.8 * charb_loss + 0.2 * ssim_loss_term
-            psnr_val, ssim_val = batch_psnr_ssim(pred, sharp)
+            # Fast on-device PSNR/SSIM — no CPU transfer, no scikit-image overhead
+            psnr_val, ssim_val = fast_batch_psnr_ssim(pred, sharp)
             total_loss += loss
             total_charb_loss += charb_loss
             total_ssim_value += ssim_value
@@ -301,7 +322,7 @@ def main() -> None:
             epoch_total_loss += float(loss.item())
             epoch_charb_loss += float(charb_loss.item())
             epoch_ssim_value += float(ssim_value.item())
-            epoch_psnr += batch_psnr_torch(pred.detach(), sharp.detach())
+            epoch_psnr += fast_batch_psnr_ssim(pred.detach(), sharp.detach())[0]
             n_train_batches += 1
 
             global_step += 1
@@ -326,7 +347,12 @@ def main() -> None:
 
             # Deterministic qualitative comparison panel (fixed val indices)
             fixed_panel_path = os.path.join(samples_dir, f"val_fixed_epoch{epoch}.png")
-            save_fixed_val_panel(model, val_ds, device, fixed_panel_path, indices=[0, 1, 2, 3, 4, 5, 6, 7])
+            save_fixed_val_panel(
+                model, val_ds, device, fixed_panel_path,
+                indices=[0, 1, 2, 3, 4, 5, 6, 7],
+                epoch=epoch,
+                loss_type=args.loss,
+            )
 
             save_curves_plots(metrics_csv, args.output_dir)
 
